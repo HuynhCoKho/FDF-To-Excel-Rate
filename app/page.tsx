@@ -21,40 +21,116 @@ function normalizeNumber(value: string) {
 }
 
 function joinWords(words: OcrWord[]) {
-  return words.sort((a, b) => a.x - b.x).map((word) => word.text).join(" ").replace(/\s+/g, " ").trim();
+  return words
+    .sort((a, b) => a.x - b.x)
+    .map((word) => word.text)
+    .join(" ")
+    .replace(/[|[\]{}]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function parsePage(words: OcrWord[], page: number, width: number) {
   const rows: Array<Omit<DataRow, "Quy đổi sang USD (1 ngoại tệ = ... USD)"> & { y: number }> = [];
-  const starters = words
-    .filter((word) => word.x / width < 0.18 && /^\s*\d{1,3}[\s.)-]*$/.test(word.text))
-    .sort((a, b) => a.y - b.y);
+  if (!words.length) return rows;
+  const height = Math.max(...words.map((word) => word.y + word.height), 1);
+  const centerX = (word: OcrWord) => word.x + word.width / 2;
+  const centerY = (word: OcrWord) => word.y + word.height / 2;
+  const yTolerance = Math.max(11, height / 245);
+  const minY = height * 0.09;
+  const maxY = height * 0.94;
 
-  for (const starter of starters) {
-    const centerY = starter.y + starter.height / 2;
-    const line = words.filter((word) => Math.abs(word.y + word.height / 2 - centerY) < Math.max(14, starter.height * 0.9));
-    const stt = normalizeNumber(starter.text);
-    const name = joinWords(line.filter((word) => word.x / width >= 0.135 && word.x / width < 0.47));
-    const codeRaw = joinWords(line.filter((word) => word.x / width >= 0.47 && word.x / width < 0.68))
+  // Windows OCR của bản local tạo neo dòng từ STT, mã hoặc tỷ giá.
+  // Tesseract thường đọc đường kẻ bảng thành [, ], | nên không thể chỉ dựa vào STT "sạch".
+  const anchors = words.flatMap((word) => {
+    const cx = centerX(word);
+    const cy = centerY(word);
+    if (cy < minY || cy > maxY) return [];
+    const rowNumber = cx < width * 0.18 ? normalizeNumber(word.text) : null;
+    const looksRow = rowNumber !== null && rowNumber > 0 && rowNumber < 1000;
+    const looksCode = cx >= width * 0.47 && cx < width * 0.62 && /^[|[\]({]*[A-Z0-9]{3,4}[|[\])}]*$/i.test(word.text.trim());
+    const looksRate = cx >= width * 0.72 && normalizeNumber(word.text) !== null;
+    return looksRow || looksCode || looksRate ? [cy] : [];
+  }).sort((a, b) => a - b);
+
+  const clusters: Array<{ y: number; count: number }> = [];
+  for (const y of anchors) {
+    const last = clusters[clusters.length - 1];
+    if (!last || Math.abs(y - last.y) > yTolerance) clusters.push({ y, count: 1 });
+    else {
+      last.y = (last.y * last.count + y) / (last.count + 1);
+      last.count++;
+    }
+  }
+
+  const makeRow = (rowY: number, recovered = false) => {
+    const line = words.filter((word) => Math.abs(centerY(word) - rowY) <= yTolerance);
+    const numberTokens = line.filter((word) => centerX(word) < width * 0.18);
+    let stt: number | null = null;
+    for (const token of numberTokens) {
+      const candidate = normalizeNumber(token.text);
+      if (candidate && candidate < 1000) { stt = candidate; break; }
+    }
+    const name = joinWords(line.filter((word) => centerX(word) >= width * 0.135 && centerX(word) < width * 0.47));
+    const codeRaw = joinWords(line.filter((word) => centerX(word) >= width * 0.47 && centerX(word) < width * 0.62))
       .toUpperCase().replace(/[^A-Z0-9]/g, "");
     const code = (codeRaw.match(/[A-Z]{3}/) || [codeRaw.slice(0, 3)])[0] || "";
-    const rateRaw = joinWords(line.filter((word) => word.x / width >= 0.68));
+    const rateRaw = joinWords(line.filter((word) => centerX(word) >= width * 0.72));
     const rate = normalizeNumber(rateRaw);
-    if (!stt || !name || /NGOẠI|TY GIA|TỶ GIÁ/i.test(name)) continue;
+    if ((!stt && !code && !rate && !recovered) || (!name && !recovered) || /NGOẠI|TY GIA|TỶ GIÁ/i.test(name)) return null;
     const warnings: string[] = [];
+    if (recovered) warnings.push("Dòng được phục hồi theo lưới bảng; cần đối chiếu.");
+    if (!name) warnings.push("Cần kiểm tra tên ngoại tệ.");
     if (!/^[A-Z]{3}$/.test(code)) warnings.push("Cần kiểm tra mã ngoại tệ.");
     if (!rate) warnings.push("Cần kiểm tra tỷ giá.");
-    rows.push({
-      STT: stt,
+    return {
+      STT: stt || 0,
       "Tên ngoại tệ": name,
       "Ngoại tệ": code,
       "Tỷ giá Ngoại tệ/VNĐ": rate || "",
       "Trang PDF": page,
       "Cảnh báo kiểm tra": warnings.join(" "),
-      y: centerY,
-    });
+      y: rowY,
+    };
+  };
+
+  const candidates = clusters
+    .map((cluster) => makeRow(cluster.y))
+    .filter((row): row is NonNullable<ReturnType<typeof makeRow>> => row !== null)
+    .sort((a, b) => a.y - b.y);
+  if (candidates.length < 10) return rows;
+
+  // Giữ đoạn liên tục dài nhất của bảng, bỏ phần công văn/tiêu đề.
+  let bestStart = 0, bestEnd = 0, start = 0;
+  for (let i = 1; i < candidates.length; i++) {
+    const gap = candidates[i].y - candidates[i - 1].y;
+    if (gap < height * 0.007 || gap > height * 0.05) {
+      if (i - 1 - start > bestEnd - bestStart) { bestStart = start; bestEnd = i - 1; }
+      start = i;
+    }
   }
-  return rows;
+  if (candidates.length - 1 - start > bestEnd - bestStart) {
+    bestStart = start;
+    bestEnd = candidates.length - 1;
+  }
+  const segment = candidates.length >= 25 ? candidates : candidates.slice(bestStart, bestEnd + 1);
+  if (segment.length < 25) return rows;
+
+  const gaps = segment.slice(1).map((row, index) => row.y - segment[index].y)
+    .filter((gap) => gap >= height * 0.007 && gap <= height * 0.028)
+    .sort((a, b) => a - b);
+  const step = gaps.length ? gaps[Math.floor(gaps.length / 2)] : height * 0.015;
+  for (let i = 0; i < segment.length; i++) {
+    rows.push(segment[i]);
+    if (i + 1 >= segment.length) continue;
+    const gap = segment[i + 1].y - segment[i].y;
+    const missing = Math.max(0, Math.round(gap / step) - 1);
+    for (let m = 1; m <= missing; m++) {
+      const recovered = makeRow(segment[i].y + step * m, true);
+      if (recovered) rows.push(recovered);
+    }
+  }
+  return rows.sort((a, b) => a.y - b.y);
 }
 
 function getUsdRate(words: OcrWord[]) {
@@ -112,7 +188,7 @@ export default function Home() {
         setStatus(`Đang đọc trang ${pageNumber}/${pdf.numPages}…`);
         setProgress(Math.round(5 + (pageNumber - 1) / pdf.numPages * 78));
         const page = await pdf.getPage(pageNumber);
-        const viewport = page.getViewport({ scale: 2 });
+        const viewport = page.getViewport({ scale: 2.35 });
         const textContent = await page.getTextContent();
         let words: OcrWord[] = [];
 
@@ -125,7 +201,14 @@ export default function Home() {
           });
         } else {
           setStatus(`Đang OCR trang scan ${pageNumber}/${pdf.numPages}…`);
-          if (!ocrWorker) ocrWorker = await createWorker("eng");
+          if (!ocrWorker) {
+            ocrWorker = await createWorker("eng");
+            await ocrWorker.setParameters({
+              tessedit_pageseg_mode: "11",
+              preserve_interword_spaces: "1",
+              user_defined_dpi: "170",
+            } as any);
+          }
           const canvas = document.createElement("canvas");
           canvas.width = viewport.width;
           canvas.height = viewport.height;

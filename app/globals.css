@@ -31,7 +31,7 @@ button, input { font: inherit; }
 .brand .author { margin: 0 0 5px; color: #a70f13; font-weight: 800; letter-spacing: .02em; }
 .privacy { display: flex; gap: 8px; align-items: center; color: #267065; background: #e3f5ef; border: 1px solid #cae9df; border-radius: 999px; padding: 9px 13px; font-size: 12px; }
 .privacy span { width: 7px; height: 7px; border-radius: 50%; background: #36a47b; box-shadow: 0 0 0 4px #36a47b20; }
-.stamp { position: fixed; z-index: 8; right: 18px; bottom: 14px; width: 128px; height: 128px; object-fit: contain; mix-blend-mode: multiply; transform: rotate(3deg); filter: saturate(1.15) contrast(1.08); pointer-events: none; }
+.stamp { position: fixed; z-index: 8; right: 18px; bottom: 14px; width: 128px; height: 128px; object-fit: contain; mix-blend-mode: multiply; filter: saturate(1.15) contrast(1.08); pointer-events: none; }
 
 .tool-card { padding: 42px; border: 1px solid #fff; border-radius: 28px; background: #ffffffdf; box-shadow: 0 28px 75px #173d5520; backdrop-filter: blur(12px); }
 .hero { max-width: 730px; margin: 0 auto 28px; text-align: center; }
