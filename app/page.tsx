@@ -99,7 +99,8 @@ export default function Home() {
       setStatus("Đang mở tài liệu PDF…");
       setProgress(2);
       const pdfjs = await import("pdfjs-dist");
-      pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+      const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+      pdfjs.GlobalWorkerOptions.workerSrc = `${basePath}/pdf.worker.min.mjs`;
       const { createWorker } = await import("tesseract.js");
       const XLSX = await import("xlsx");
       const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
@@ -205,13 +206,13 @@ export default function Home() {
         <div className="brand">
           <div className="logo" aria-hidden="true">▦</div>
           <div>
-            <h1>PDF Table Extractor</h1>
             <p className="author">Author: Huỳnh Cỏ Khô</p>
+            <h1>PDF Table Extractor</h1>
             <p>Trích xuất bảng tỷ giá PDF thành Excel</p>
           </div>
         </div>
         <div className="privacy"><span /> Xử lý ngay trên thiết bị</div>
-        <img className="stamp" src="/dau-ten.png" alt="Con dấu Huỳnh Cỏ Khô" />
+        <img className="stamp" src={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/dau-ten.png`} alt="Con dấu Huỳnh Cỏ Khô" />
       </header>
 
       <section className="tool-card">

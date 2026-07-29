@@ -23,15 +23,15 @@ body {
 button, input { font: inherit; }
 
 .page-shell { width: min(1060px, calc(100% - 32px)); min-height: 100vh; margin: auto; padding: 34px 0 24px; }
-.topbar { position: relative; display: flex; align-items: center; justify-content: space-between; min-height: 92px; margin-bottom: 18px; padding-right: 150px; }
+.topbar { position: relative; display: flex; align-items: center; justify-content: space-between; min-height: 92px; margin-bottom: 18px; }
 .brand { display: flex; align-items: center; gap: 14px; }
 .logo { width: 54px; height: 54px; display: grid; place-items: center; color: white; font-size: 25px; border-radius: 16px; background: linear-gradient(145deg, var(--blue), var(--cyan)); box-shadow: 0 11px 28px #176b8738; }
 .brand h1 { margin: 0; color: var(--navy); font-size: 21px; letter-spacing: -.02em; }
 .brand p { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
-.brand .author { color: #a70f13; font-weight: 800; letter-spacing: .02em; }
+.brand .author { margin: 0 0 5px; color: #a70f13; font-weight: 800; letter-spacing: .02em; }
 .privacy { display: flex; gap: 8px; align-items: center; color: #267065; background: #e3f5ef; border: 1px solid #cae9df; border-radius: 999px; padding: 9px 13px; font-size: 12px; }
 .privacy span { width: 7px; height: 7px; border-radius: 50%; background: #36a47b; box-shadow: 0 0 0 4px #36a47b20; }
-.stamp { position: absolute; z-index: 3; right: -4px; top: -27px; width: 135px; height: 135px; object-fit: contain; mix-blend-mode: multiply; transform: rotate(3deg); filter: saturate(1.15) contrast(1.08); }
+.stamp { position: fixed; z-index: 8; right: 18px; bottom: 14px; width: 128px; height: 128px; object-fit: contain; mix-blend-mode: multiply; transform: rotate(3deg); filter: saturate(1.15) contrast(1.08); pointer-events: none; }
 
 .tool-card { padding: 42px; border: 1px solid #fff; border-radius: 28px; background: #ffffffdf; box-shadow: 0 28px 75px #173d5520; backdrop-filter: blur(12px); }
 .hero { max-width: 730px; margin: 0 auto 28px; text-align: center; }
@@ -64,9 +64,9 @@ footer { padding-top: 18px; color: var(--muted); text-align: center; font-size: 
 
 @media (max-width: 720px) {
   .page-shell { width: min(100% - 22px, 1060px); padding-top: 18px; }
-  .topbar { align-items: flex-start; padding-right: 88px; min-height: 112px; }
+  .topbar { align-items: flex-start; min-height: 112px; }
   .logo, .privacy { display: none; }
-  .stamp { width: 96px; height: 96px; right: -6px; top: -15px; }
+  .stamp { width: 88px; height: 88px; right: 8px; bottom: 8px; opacity: .9; }
   .brand h1 { font-size: 19px; }
   .tool-card { padding: 27px 16px; border-radius: 23px; }
   .features { grid-template-columns: 1fr; }
